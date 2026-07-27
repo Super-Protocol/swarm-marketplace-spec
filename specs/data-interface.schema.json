@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://swarm.cloud/schemas/v1alpha1/data-interface.schema.json",
+  "title": "DataInterface",
+  "description": "A named, versioned contract describing one way of connecting to data (the protocol layer of data compatibility).",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "swarm.cloud/v1alpha1",
+      "description": "Specification version."
+    },
+    "kind": {
+      "type": "string",
+      "const": "DataInterface",
+      "description": "Resource kind."
+    },
+    "metadata": {
+      "$ref": "#/definitions/Metadata"
+    },
+    "spec": {
+      "$ref": "#/definitions/Spec"
+    }
+  },
+  "definitions": {
+    "Metadata": {
+      "type": "object",
+      "required": ["name", "version", "title", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+          "description": "Unique interface identifier. Must be lowercase alphanumeric with hyphens."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^v[0-9]+((alpha|beta)[0-9]+)?$",
+          "description": "Contract version, following Kubernetes API versioning conventions (v1alpha1, v1beta1, v1, ...)."
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable display name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description of the connection method (1-2 sentences)."
+        }
+      }
+    },
+    "Spec": {
+      "type": "object",
+      "required": ["connection"],
+      "additionalProperties": false,
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/Connection"
+        }
+      }
+    },
+    "Connection": {
+      "type": "object",
+      "required": ["properties"],
+      "additionalProperties": false,
+      "properties": {
+        "properties": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/definitions/ConnectionProperty"
+          },
+          "description": "Map of connection property names to their definitions. Defines the shape of the resolved binding object."
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "description": "Property names that must be present in every resolved binding."
+        }
+      }
+    },
+    "ConnectionProperty": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["string", "integer", "number", "boolean"],
+          "description": "Data type of the connection property."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the property."
+        },
+        "default": {
+          "description": "Default value. Must match the declared type."
+        },
+        "secret": {
+          "type": "boolean",
+          "default": false,
+          "description": "Secret properties are sealed for the target TEE and never exposed in plaintext to users, app authors, or the marketplace."
+        }
+      }
+    }
+  }
+}

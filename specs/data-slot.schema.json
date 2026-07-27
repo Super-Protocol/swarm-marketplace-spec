@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://swarm.cloud/schemas/v1alpha1/data-slot.schema.json",
+  "title": "DataSlot",
+  "description": "A named socket in an application that marketplace datasets can be bound into at configure time.",
+  "type": "object",
+  "required": ["name", "title", "accepts"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+      "description": "Slot identifier, unique within the application. Used in the data.<slot> expression namespace."
+    },
+    "title": {
+      "type": "string",
+      "description": "Display label shown in the configure flow."
+    },
+    "description": {
+      "type": "string",
+      "description": "Help text shown below the dataset picker."
+    },
+    "required": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether at least one dataset must be bound before deployment."
+    },
+    "multiple": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether more than one dataset may be bound to this slot."
+    },
+    "accepts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/AcceptedInterface"
+      },
+      "description": "Ordered list of accepted data interfaces. Order defines negotiation preference."
+    },
+    "schema": {
+      "$ref": "#/definitions/SchemaConstraint",
+      "description": "Semantic constraints a bound dataset must satisfy."
+    }
+  },
+  "definitions": {
+    "AcceptedInterface": {
+      "type": "object",
+      "required": ["interface"],
+      "additionalProperties": false,
+      "properties": {
+        "interface": {
+          "$ref": "#/definitions/InterfaceRef"
+        }
+      }
+    },
+    "InterfaceRef": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]/v[0-9]+((alpha|beta)[0-9]+)?$",
+      "description": "Reference to a DataInterface in the form <name>/<version>, e.g. clickhouse-native/v1."
+    },
+    "SchemaConstraint": {
+      "type": "object",
+      "required": ["tables"],
+      "additionalProperties": false,
+      "properties": {
+        "tables": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/TableConstraint"
+          },
+          "description": "Table constraints. Every constraint must be satisfied by a distinct dataset table."
+        }
+      }
+    },
+    "TableConstraint": {
+      "type": "object",
+      "required": ["columns"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+          "description": "If set, the constraint must be satisfied by the dataset table with this exact name. If omitted, any table qualifies."
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/RequiredColumn"
+          },
+          "description": "Columns that must exist in the matching table."
+        }
+      }
+    },
+    "RequiredColumn": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+          "description": "Required column name (exact match)."
+        },
+        "type": {
+          "$ref": "data-schema.schema.json#/definitions/ColumnType",
+          "description": "Required column type. See type compatibility rules in the specification."
+        },
+        "items": {
+          "$ref": "data-schema.schema.json#/definitions/ColumnType",
+          "description": "Required element type. Only valid when type is 'array'; if set, the dataset column's element type must match."
+        },
+        "dimensions": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Required vector length. Only valid when type is 'vector'; if set, the dataset column's dimensions must match exactly."
+        }
+      }
+    }
+  }
+}

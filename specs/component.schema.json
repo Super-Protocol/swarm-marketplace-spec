@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://swarm.cloud/schemas/v1alpha1/component.schema.json",
+  "title": "Component",
+  "description": "A deployable component within an application, consisting of a Helm chart source and deployment configuration.",
+  "type": "object",
+  "required": ["name", "source", "deployment"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+      "description": "Unique component identifier within the application."
+    },
+    "dependsOn": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of component names that must be deployed before this one."
+    },
+    "source": {
+      "$ref": "#/definitions/Source"
+    },
+    "images": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/Image"
+      },
+      "description": "Allow-list of container images this component may run, pinned by digest. Every image in the rendered manifests must appear here; used to compute the expected evidence digest before deployment."
+    },
+    "deployment": {
+      "$ref": "deployment.schema.json"
+    }
+  },
+  "definitions": {
+    "Image": {
+      "type": "object",
+      "required": ["name", "digest"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Image reference without tag or digest (e.g. ollama/ollama, ghcr.io/open-webui/open-webui)."
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "description": "Pinned image digest."
+        }
+      }
+    },
+    "Source": {
+      "type": "object",
+      "required": ["type", "repoUrl", "chart", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "helm",
+          "description": "Source type. Currently only 'helm' is supported."
+        },
+        "repoUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Helm chart repository URL."
+        },
+        "chart": {
+          "type": "string",
+          "description": "Chart name within the repository."
+        },
+        "version": {
+          "type": "string",
+          "description": "Chart version (SemVer)."
+        }
+      }
+    }
+  }
+}

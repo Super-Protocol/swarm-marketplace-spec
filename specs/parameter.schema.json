@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://swarm.cloud/schemas/v1alpha1/parameter.schema.json",
+  "title": "Parameter",
+  "description": "Defines a user-configurable input parameter for an application.",
+  "type": "object",
+  "required": ["id", "type", "title"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+      "description": "Unique parameter identifier."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["string", "number", "integer", "boolean"],
+      "description": "Data type of the parameter value."
+    },
+    "title": {
+      "type": "string",
+      "description": "Display label shown in the UI."
+    },
+    "description": {
+      "type": "string",
+      "description": "Help text shown below the field."
+    },
+    "required": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the field must be filled."
+    },
+    "sensitive": {
+      "type": "boolean",
+      "default": false,
+      "description": "Marks the parameter as secret. The value is sealed for the target TEE, masked in the UI, automatically stripped from the deployment evidence snapshot (recorded as a hidden field), and may only surface through outputs of type 'secret'."
+    },
+    "generated": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true and the user leaves the field blank, the platform generates a cryptographically random value. Only valid for sensitive string parameters."
+    },
+    "immutable": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, the value cannot be changed when reconfiguring an existing deployment."
+    },
+    "default": {
+      "description": "Default value. Must match the declared type."
+    },
+    "options": {
+      "$ref": "value-source.schema.json",
+      "description": "Available choices for this parameter."
+    },
+    "validation": {
+      "$ref": "#/definitions/Validation",
+      "description": "Validation constraints."
+    }
+  },
+  "definitions": {
+    "Validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "Regex pattern the string value must match."
+        },
+        "minLength": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum string length."
+        },
+        "maxLength": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum string length."
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum value (inclusive) for number/integer types."
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum value (inclusive) for number/integer types."
+        },
+        "step": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Step increment for sliders."
+        }
+      }
+    }
+  }
+}

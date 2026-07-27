@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://swarm.cloud/schemas/v1alpha1/resource-requirements.schema.json",
+  "title": "ResourceRequirements",
+  "description": "Declares compute resources required by an application for scheduling decisions.",
+  "type": "object",
+  "required": ["min"],
+  "additionalProperties": false,
+  "properties": {
+    "min": {
+      "$ref": "#/definitions/ResourceSet",
+      "description": "Minimum resources required. Deployment must be rejected if not satisfiable."
+    },
+    "recommended": {
+      "$ref": "#/definitions/RecommendedResourceSet",
+      "description": "Recommended resources for optimal performance."
+    },
+    "gpu": {
+      "$ref": "#/definitions/GpuRequirements",
+      "description": "GPU-specific requirements."
+    }
+  },
+  "definitions": {
+    "KubernetesQuantity": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?(m|Ki|Mi|Gi|Ti|Pi|Ei)?$",
+      "description": "A quantity in Kubernetes resource format (e.g., '2', '500m', '4Gi')."
+    },
+    "ResourceSet": {
+      "type": "object",
+      "required": ["cpu", "memory"],
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "$ref": "#/definitions/KubernetesQuantity",
+          "description": "Minimum CPU cores."
+        },
+        "memory": {
+          "$ref": "#/definitions/KubernetesQuantity",
+          "description": "Minimum memory."
+        },
+        "storage": {
+          "$ref": "#/definitions/KubernetesQuantity",
+          "description": "Minimum persistent storage."
+        }
+      }
+    },
+    "RecommendedResourceSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "$ref": "#/definitions/KubernetesQuantity",
+          "description": "Recommended CPU cores."
+        },
+        "memory": {
+          "$ref": "#/definitions/KubernetesQuantity",
+          "description": "Recommended memory."
+        },
+        "storage": {
+          "$ref": "#/definitions/KubernetesQuantity",
+          "description": "Recommended persistent storage."
+        }
+      }
+    },
+    "GpuRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether a GPU is mandatory for this application."
+        },
+        "minCount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Minimum number of GPUs."
+        },
+        "minVram": {
+          "$ref": "#/definitions/KubernetesQuantity",
+          "description": "Minimum VRAM per GPU."
+        },
+        "types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of acceptable GPU types."
+        }
+      }
+    }
+  }
+}

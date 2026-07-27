@@ -1,0 +1,72 @@
+apiVersion: swarm.cloud/v1alpha1
+kind: DataDefinition
+
+metadata:
+  name: retail-transactions
+  title: Retail Transactions 2024
+  description: Anonymized point-of-sale transactions from a European retail chain, updated daily.
+  category: retail
+  tags:
+    - retail
+    - transactions
+    - timeseries
+
+spec:
+  secrets:
+    - name: chReadUser
+      title: ClickHouse read-only user
+    - name: chReadPass
+      title: ClickHouse read-only password
+    - name: awsAdminKeyId
+      title: AWS access key ID (IAM admin)
+    - name: awsAdminSecret
+      title: AWS secret access key (IAM admin)
+
+  provides:
+    - interface: clickhouse-native/v1
+      connection:
+        static:
+          host: ch.acme-data.internal
+          port: 9440
+          database: retail
+          username: "{{ secrets.chReadUser }}"
+          password: "{{ secrets.chReadPass }}"
+          tls: true
+
+    - interface: s3-parquet/v1
+      connection:
+        provisioner:
+          image: acme/s3-creds-minter@sha256:b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c
+          env:
+            ACTION: "{{ binding.action }}"
+            DEPLOYMENT_ID: "{{ binding.deploymentId }}"
+            CONSUMER_ORG: "{{ binding.organization }}"
+            CONSUMER_APP: "{{ binding.app }}"
+            EVIDENCE_DIGEST: "{{ binding.evidenceDigest }}"
+            AWS_ACCESS_KEY_ID: "{{ secrets.awsAdminKeyId }}"
+            AWS_SECRET_ACCESS_KEY: "{{ secrets.awsAdminSecret }}"
+
+  schema:
+    tables:
+      - name: transactions
+        description: One row per purchased line item.
+        columns:
+          - name: ts
+            type: timestamp
+            description: Purchase time (UTC).
+          - name: store_id
+            type: string
+            description: Anonymized store identifier.
+          - name: sku
+            type: string
+            description: Stock keeping unit.
+          - name: quantity
+            type: integer
+            description: Units purchased.
+          - name: amount
+            type: number
+            description: Line total in EUR.
+          - name: text
+            type: string
+            nullable: true
+            description: Free-text product description.

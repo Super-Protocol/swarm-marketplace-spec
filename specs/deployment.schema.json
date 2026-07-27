@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://swarm.cloud/schemas/v1alpha1/deployment.schema.json",
+  "title": "Deployment",
+  "description": "Defines how user parameter values are transformed into Helm values via base values and patches.",
+  "type": "object",
+  "required": ["values"],
+  "additionalProperties": false,
+  "properties": {
+    "values": {
+      "type": "object",
+      "required": ["base"],
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "type": "object",
+          "description": "Static Helm values applied unconditionally before any patches.",
+          "additionalProperties": true
+        },
+        "patches": {
+          "type": "array",
+          "description": "Ordered list of conditional modifications applied to the base values.",
+          "items": {
+            "$ref": "#/definitions/Patch"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Patch": {
+      "type": "object",
+      "required": ["op", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": ["add", "replace", "remove"],
+          "description": "The operation to perform."
+        },
+        "path": {
+          "type": "string",
+          "description": "Dot-notation path to the target value (e.g., 'ingress.hosts.0.host').",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)*$"
+        },
+        "value": {
+          "description": "The value to set. Required for 'add' and 'replace' operations. Supports expression interpolation via {{ params.<id> }}."
+        },
+        "when": {
+          "type": "string",
+          "description": "Expression that must evaluate to true for the patch to apply. If omitted, the patch always applies."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "op": { "enum": ["add", "replace"] }
+            }
+          },
+          "then": {
+            "required": ["op", "path", "value"]
+          }
+        }
+      ]
+    }
+  }
+}

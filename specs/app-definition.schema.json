@@ -1,0 +1,220 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://swarm.cloud/schemas/v1alpha1/app-definition.schema.json",
+  "title": "AppDefinition",
+  "description": "Root schema for a Swarm Cloud Marketplace application definition (v1alpha1).",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "ui", "parameters", "resources", "components"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "swarm.cloud/v1alpha1",
+      "description": "Specification version."
+    },
+    "kind": {
+      "type": "string",
+      "const": "AppDefinition",
+      "description": "Resource kind."
+    },
+    "metadata": {
+      "$ref": "#/definitions/Metadata"
+    },
+    "ui": {
+      "$ref": "#/definitions/UI"
+    },
+    "parameters": {
+      "type": "array",
+      "items": {
+        "$ref": "parameter.schema.json"
+      },
+      "description": "List of user-configurable parameters."
+    },
+    "secrets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "publisher-secret.schema.json"
+      },
+      "description": "Publisher secrets required by this application. Values are entered by the publishing organization at publication time and referenced via {{ secrets.<name> }} in deployment values."
+    },
+    "resources": {
+      "$ref": "resource-requirements.schema.json",
+      "description": "Compute resource requirements for scheduling."
+    },
+    "data": {
+      "type": "object",
+      "required": ["slots"],
+      "additionalProperties": false,
+      "properties": {
+        "slots": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "data-slot.schema.json"
+          },
+          "description": "Named data slots that marketplace datasets can be bound into at configure time."
+        }
+      },
+      "description": "Data requirements of the application."
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "component.schema.json"
+      },
+      "description": "Ordered list of deployable components."
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Output"
+      },
+      "description": "Values exposed to the user after deployment."
+    }
+  },
+  "definitions": {
+    "Metadata": {
+      "type": "object",
+      "required": ["name", "title", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+          "description": "Unique application identifier. Must be lowercase alphanumeric with hyphens."
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable display name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description (1-2 sentences)."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$",
+          "description": "User-facing application version (SemVer). Independent of component chart versions."
+        },
+        "category": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Single catalog category from the marketplace taxonomy (e.g. ai-inference, data-storage, web-apps)."
+        },
+        "sourceRepo": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the application's source repository. Input for audits and AI review."
+        },
+        "license": {
+          "type": "string",
+          "description": "SPDX license identifier of the application's source code (e.g. MIT, Apache-2.0)."
+        },
+        "icon": {
+          "type": "string",
+          "description": "Relative path to the icon file."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tags for filtering and search."
+        }
+      }
+    },
+    "UI": {
+      "type": "object",
+      "required": ["sections"],
+      "additionalProperties": false,
+      "properties": {
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/Section"
+          },
+          "description": "Ordered list of form sections."
+        }
+      }
+    },
+    "Section": {
+      "type": "object",
+      "required": ["id", "title", "fields"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Section identifier."
+        },
+        "title": {
+          "type": "string",
+          "description": "Section heading."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional helper text below the heading."
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/Field"
+          },
+          "description": "Ordered list of fields in this section."
+        }
+      }
+    },
+    "Field": {
+      "type": "object",
+      "required": ["parameterId"],
+      "additionalProperties": false,
+      "properties": {
+        "parameterId": {
+          "type": "string",
+          "description": "References a parameter by id."
+        },
+        "widget": {
+          "type": "string",
+          "enum": ["text", "textarea", "number", "select", "switch", "slider", "password"],
+          "description": "Widget type override. Defaults based on parameter type."
+        },
+        "visible": {
+          "type": "string",
+          "description": "Expression controlling field visibility."
+        }
+      }
+    },
+    "Output": {
+      "type": "object",
+      "required": ["id", "title", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique output identifier."
+        },
+        "title": {
+          "type": "string",
+          "description": "Display label."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["url", "string", "secret"],
+          "default": "string",
+          "description": "Output type hint."
+        },
+        "value": {
+          "type": "string",
+          "description": "Value template. Supports {{ params.<id> }}, {{ components.<name>.release }}, and {{ namespace }} interpolation."
+        },
+        "when": {
+          "type": "string",
+          "description": "Expression controlling whether this output is shown."
+        }
+      }
+    }
+  }
+}

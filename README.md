@@ -1038,6 +1038,7 @@ accepts:
 | Interface              | Description                                                        |
 |------------------------|--------------------------------------------------------------------|
 | `clickhouse-native/v1` | Direct access to a ClickHouse database over the native TCP protocol. |
+| `clickhouse-http/v1`   | Access to a ClickHouse database over its HTTP interface.           |
 | `s3-parquet/v1`        | Read access to Parquet files in an S3-compatible bucket.           |
 | `s3-jsonl/v1`          | Read access to JSON Lines files in an S3-compatible bucket.        |
 | `s3-csv/v1`            | Read access to CSV files in an S3-compatible bucket.               |
@@ -1200,6 +1201,42 @@ Minted credentials SHOULD embed the binding identity (e.g. an IAM user named aft
 
 Each table: `name` (required), `description`, `columns` (required, min 1). Each column: `name`, `type` (required), `description`, `nullable` (default `false`), plus `items` (element type, for `array` columns) and `dimensions` (vector length, for `vector` columns).
 
+#### Semantic Annotations
+
+Two optional column fields carry meaning the storage type cannot:
+
+| Field        | Type     | Description                                                                                     |
+|--------------|----------|-------------------------------------------------------------------------------------------------|
+| `role`       | `string` | `measure` (aggregated) or `dimension` (grouped or filtered by). A `0`/`1` flag and a body weight are both numbers; only the publisher knows which is which. |
+| `references` | `string` | `<table>.<column>` within the same dataset that this column points at -- the dataset's own foreign keys. MUST resolve to a declared column (validated at publication). |
+
+They exist because consumers increasingly build a semantic layer over a bound dataset -- a text-to-SQL agent's knowledge graph, a BI model, a query planner -- and that layer needs to know what each column is *for* and how tables join. Without them, every consumer re-derives the same facts by guesswork, or the data owner hand-writes a second description outside the marketplace that immediately drifts from the first.
+
+```yaml
+schema:
+  tables:
+    - name: patients
+      description: One row per enrolled patient (anonymised).
+      columns:
+        - name: patient_id
+          type: string
+          role: dimension
+          description: Anonymous patient identifier (primary key).
+    - name: daily_health
+      description: One row per patient-day, wearable and self-reported.
+      columns:
+        - name: patient_id
+          type: string
+          role: dimension
+          references: patients.patient_id
+        - name: steps
+          type: integer
+          role: measure
+          description: Daily step count.
+```
+
+Both fields are additive and optional: a dataset that omits them is exactly as valid as before, and schema matching ignores them.
+
 #### Column Types
 
 | Type        | Description                                    |
@@ -1293,7 +1330,7 @@ At configure time the user fills each slot with datasets. At deploy time the pla
 | `data.<slot>.dataset`               | single slots  | Name of the bound dataset (`metadata.name`).                        |
 | `data.<slot>.interface`             | single slots  | Negotiated interface reference, e.g. `clickhouse-native/v1`.        |
 | `data.<slot>.connection.<property>` | single slots  | Resolved connection property, as defined by the negotiated interface. |
-| `data.<slot> \| json`               | all slots     | Entire binding serialized as JSON.                                  |
+| `data.<slot> \| json`               | all slots     | Entire binding serialized as JSON, including the dataset's declared schema. |
 
 For `multiple: true` slots, per-property access is not available -- inject the whole slot via the `json` filter. Accessing properties of an empty optional slot is a deploy-time error; guard such patches with `when: "data.<slot>.count > 0"`.
 
@@ -1309,6 +1346,8 @@ Each object has the shape:
 ```json
 {
   "dataset": "retail-transactions",
+  "title": "Retail Transactions 2024",
+  "description": "Anonymized point-of-sale transactions from a European retail chain, updated daily.",
   "interface": "clickhouse-native/v1",
   "connection": {
     "host": "…",
@@ -1317,9 +1356,23 @@ Each object has the shape:
     "username": "…",
     "password": "…",
     "tls": true
+  },
+  "schema": {
+    "tables": [
+      {
+        "name": "transactions",
+        "description": "One row per purchased line item.",
+        "columns": [
+          { "name": "ts", "type": "timestamp", "role": "dimension", "description": "Purchase time (UTC)." },
+          { "name": "amount", "type": "number", "role": "measure", "description": "Line total in EUR." }
+        ]
+      }
+    ]
   }
 }
 ```
+
+`title`, `description` and `schema` are the dataset's own [semantic layer](#schema-semantic-layer), carried into the binding verbatim. They are listing-public facts, so they travel in the clear next to the connection rather than being sealed with it, and each is omitted when the dataset does not declare it. An application that must *understand* the data -- generate SQL against it, index it, build a knowledge graph over it -- reads them here instead of asking the deploying user to re-describe data they did not publish.
 
 A value produced by `| json` that includes secret connection properties is treated as secret in its entirety -- see below.
 

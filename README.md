@@ -767,6 +767,38 @@ The expression system supports the following namespaces:
 | `data.<slot>`                   | Resolved data binding for the named slot (count, dataset, interface, connection properties). See [Binding Resolution](#binding-resolution). |
 | `secrets.<name>`                | Publisher secret declared in the definition's `secrets` list; the value lives in the owner's console vault. See [Publisher Secrets](#publisher-secrets). |
 | `binding.<field>`               | Binding context for credential provisioners (`action`, `deploymentId`, `organization`, `app`, `evidenceDigest`). Provisioner environments only. See [Binding Context](#binding-context). |
+| `consumer.<subject>.<field>`    | Who this is being deployed for: `consumer.organization.name`, `consumer.organization.slug`, `consumer.user.name`, `consumer.user.email`. See [Consumer](#consumer). |
+
+#### Consumer
+
+An application frequently has to name its operator in something it creates: a tenant, a
+workspace, a first administrator account. `consumer` is what the marketplace already knows about
+who is deploying, so the definition can read it instead of adding a parameter that asks the
+deploying user to retype it.
+
+| Reference                       | Description                                          |
+|---------------------------------|------------------------------------------------------|
+| `consumer.organization.name`    | Display name of the organization the deployment belongs to. |
+| `consumer.organization.slug`    | Its stable identifier, safe for URLs and object names. |
+| `consumer.user.name`            | Display name of the user performing the deployment.  |
+| `consumer.user.email`           | Their email address.                                 |
+
+```yaml
+patches:
+  - op: replace
+    path: tenant.name
+    value: "{{ consumer.organization.name }}"
+  - op: replace
+    path: administrator.email
+    value: "{{ consumer.user.email }}"
+```
+
+The platform resolves these itself, from the account making the request — a definition cannot be
+handed an organization the caller does not belong to. The fields are identity, not a profile:
+nothing else about the organization or the user is exposed, and the set grows only by spec change.
+
+Available in `values.base`, `patch.value`, `patch.when`, `output.value` and `output.when`. Never
+secret.
 
 #### 7.2 Syntax
 
@@ -782,6 +814,10 @@ data.<slotName>.interface
 data.<slotName>.connection.<property>
 secrets.<name>
 binding.<field>
+consumer.organization.name
+consumer.organization.slug
+consumer.user.name
+consumer.user.email
 ```
 
 **Comparison operators:**
@@ -822,16 +858,16 @@ Expressions can be used in the following contexts:
 
 | Context                          | Field                                     | Allowed namespaces                                    | Purpose                          |
 |----------------------------------|-------------------------------------------|-------------------------------------------------------|----------------------------------|
-| Base values                      | `deployment.values.base`                  | `params`, `components`, `namespace`, `data`, `secrets` | Inter-component references.      |
-| Patch value interpolation        | `deployment.values.patches[].value`       | `params`, `components`, `namespace`, `data`, `secrets` | Inject parameter and binding values. |
-| Patch conditions                 | `deployment.values.patches[].when`        | `params`, `data` (only `count` / `interface`)         | Conditionally apply patches.     |
+| Base values                      | `deployment.values.base`                  | `params`, `components`, `namespace`, `data`, `secrets`, `consumer` | Inter-component references.      |
+| Patch value interpolation        | `deployment.values.patches[].value`       | `params`, `components`, `namespace`, `data`, `secrets`, `consumer` | Inject parameter and binding values. |
+| Patch conditions                 | `deployment.values.patches[].when`        | `params`, `data` (only `count` / `interface`), `consumer` | Conditionally apply patches. |
 | UI field visibility              | `ui.sections[].fields[].visible`          | `params`                                              | Show/hide form fields.           |
-| Output value templates           | `outputs[].value`                         | `params`, `components`, `namespace`, `data` (non-secret only) | Compute output values.    |
-| Output conditions                | `outputs[].when`                          | `params`, `data` (only `count` / `interface`)         | Conditionally show outputs.      |
+| Output value templates           | `outputs[].value`                         | `params`, `components`, `namespace`, `data` (non-secret only), `consumer` | Compute output values. |
+| Output conditions                | `outputs[].when`                          | `params`, `data` (only `count` / `interface`), `consumer` | Conditionally show outputs.  |
 | Static connection templates      | `spec.provides[].connection.static`       | `secrets`                                             | Fill connection properties at publication render. |
 | Provisioner environment          | `spec.provides[].connection.provisioner.env` | `secrets`, `binding`                               | Inputs for per-binding credential minting. |
 
-> **Note:** Conditions (`when`, `visible`) only support values known at configure time. Component release names, namespace, and connection properties are resolved at deploy time, so they are excluded from conditions. Of the `data` namespace, only `data.<slot>.count` and `data.<slot>.interface` are known at configure time (the user has selected datasets, but credentials are not yet brokered) and are therefore allowed in `when`. `visible` remains `params`-only because the Data step is rendered after the parameter sections. Secret connection properties and `secrets.*` values MUST NOT be used in outputs or conditions -- see [Secrets & Attestation](#secrets--attestation). The `binding` namespace exists only inside provisioner environments.
+> **Note:** Conditions (`when`, `visible`) only support values known at configure time. Component release names, namespace, and connection properties are resolved at deploy time, so they are excluded from conditions. Of the `data` namespace, only `data.<slot>.count` and `data.<slot>.interface` are known at configure time (the user has selected datasets, but credentials are not yet brokered) and are therefore allowed in `when`. `visible` remains `params`-only because the Data step is rendered after the parameter sections. Secret connection properties and `secrets.*` values MUST NOT be used in outputs or conditions -- see [Secrets & Attestation](#secrets--attestation). The `binding` namespace exists only inside provisioner environments. The `consumer` namespace is known before anything is rendered and is never secret, so it is available wherever expressions are.
 
 #### 7.4 Limitations
 

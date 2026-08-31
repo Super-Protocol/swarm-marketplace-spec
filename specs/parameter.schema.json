@@ -14,8 +14,21 @@
     },
     "type": {
       "type": "string",
-      "enum": ["string", "number", "integer", "boolean"],
+      "enum": ["string", "number", "integer", "boolean", "array"],
       "description": "Data type of the parameter value."
+    },
+    "items": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "integer"],
+          "description": "Data type of each element."
+        }
+      },
+      "description": "Element schema. Required when type is 'array', forbidden otherwise."
     },
     "title": {
       "type": "string",
@@ -46,7 +59,7 @@
       "description": "If true, the value cannot be changed when reconfiguring an existing deployment."
     },
     "default": {
-      "description": "Default value. Must match the declared type."
+      "description": "Default value. Must match the declared type; for type 'array' it is a JSON array whose elements match 'items.type' and are drawn from 'options'."
     },
     "options": {
       "$ref": "value-source.schema.json",
@@ -57,6 +70,38 @@
       "description": "Validation constraints."
     }
   },
+  "allOf": [
+    {
+      "description": "'items' and 'options' are required for array parameters and 'items' is forbidden elsewhere; arrays default to a list and cannot be sensitive or generated.",
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "const": "array"
+          }
+        }
+      },
+      "then": {
+        "required": ["items", "options"],
+        "properties": {
+          "default": {
+            "type": "array"
+          },
+          "sensitive": {
+            "const": false
+          },
+          "generated": {
+            "const": false
+          }
+        }
+      },
+      "else": {
+        "not": {
+          "required": ["items"]
+        }
+      }
+    }
+  ],
   "definitions": {
     "Validation": {
       "type": "object",
@@ -88,6 +133,16 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Step increment for sliders."
+        },
+        "minItems": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum number of selected elements for array types."
+        },
+        "maxItems": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum number of selected elements for array types."
         }
       }
     }

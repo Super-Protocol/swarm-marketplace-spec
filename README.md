@@ -382,7 +382,7 @@ For each component, values are evaluated as follows:
 2. Iterate through `patches` in array order.
 3. For each patch:
    a. If `when` is present, evaluate the expression. Skip if `false`.
-   b. Resolve any `{{ }}` interpolation in `value`.
+   b. Resolve any `{{ }}` interpolation in `value`, recursively through nested objects and arrays, following [Native-Type Interpolation](#native-type-interpolation).
    c. Apply the operation.
 4. The resulting object is passed to Helm as values for this component's chart.
 
@@ -491,15 +491,18 @@ Each field binds a parameter to a UI widget.
 
 #### 3.3 Widget Types
 
-| Widget     | Description                     | Default for type         |
-|------------|---------------------------------|--------------------------|
-| `text`     | Single-line text input          | `string`                 |
-| `textarea` | Multi-line text input           | --                       |
-| `number`   | Numeric input with step         | `number`, `integer`      |
-| `select`   | Dropdown selection              | any type with `options`  |
-| `switch`   | Boolean toggle                  | `boolean`                |
-| `slider`   | Range slider                    | `number` with min/max    |
-| `password` | Masked text input               | --                       |
+| Widget        | Description                  | Default for type           |
+|---------------|------------------------------|----------------------------|
+| `text`        | Single-line text input       | `string`                   |
+| `textarea`    | Multi-line text input        | --                         |
+| `number`      | Numeric input with step      | `number`, `integer`        |
+| `select`      | Dropdown selection           | scalar type with `options` |
+| `multiselect` | Checkbox group, multi-pick   | `array`                    |
+| `switch`      | Boolean toggle               | `boolean`                  |
+| `slider`      | Range slider                 | `number` with min/max      |
+| `password`    | Masked text input            | --                         |
+
+A widget must be compatible with its parameter's type: `multiselect` requires `type: array`, and `select` requires a scalar type with `options`.
 
 **Example:**
 
@@ -544,15 +547,16 @@ Parameters define the user-configurable inputs. They are global -- shared across
 | Field          | Type       | Required | Description                                                      |
 |----------------|------------|----------|------------------------------------------------------------------|
 | `id`           | `string`   | Yes      | Unique identifier. Must match `[a-zA-Z][a-zA-Z0-9_]*`.          |
-| `type`         | `string`   | Yes      | Data type: `string`, `number`, `integer`, `boolean`.             |
+| `type`         | `string`   | Yes      | Data type: `string`, `number`, `integer`, `boolean`, `array`.    |
+| `items`        | `object`   | Cond.    | Element schema, `{ type: string \| number \| integer }`. Required when `type` is `array`, forbidden otherwise. |
 | `title`        | `string`   | Yes      | Display label.                                                   |
 | `description`  | `string`   | No       | Help text shown below the field.                                 |
 | `required`     | `boolean`  | No       | Whether the field must be filled. Default: `false`.              |
-| `default`      | `any`      | No       | Default value. Must match `type`.                                |
-| `sensitive`    | `boolean`  | No       | Marks the parameter as secret. Default: `false`. See [4.2](#42-secrets--lifecycle). |
+| `default`      | `any`      | No       | Default value. Must match `type`; for `array`, a list of values drawn from `options`. |
+| `sensitive`    | `boolean`  | No       | Marks the parameter as secret. Default: `false`. See [4.3](#43-secrets--lifecycle). |
 | `generated`    | `boolean`  | No       | Generate a random value when left blank. Only for sensitive string parameters. Default: `false`. |
 | `immutable`    | `boolean`  | No       | Value cannot be changed when reconfiguring an existing deployment. Default: `false`. |
-| `options`      | `ValueSource` | No   | Defines available choices. See [Value Source](#5-options--value-source). |
+| `options`      | `ValueSource` | Cond. | Defines available choices. Required when `type` is `array`. See [Value Source](#5-options--value-source). |
 | `validation`   | `object`   | No       | Validation constraints (see below).                              |
 
 #### 4.1 Validation
@@ -574,6 +578,15 @@ Validation rules depend on the parameter type.
 | `min`       | `number` | Minimum value (inclusive).  |
 | `max`       | `number` | Maximum value (inclusive).  |
 | `step`      | `number` | Step increment for sliders. |
+
+**Array validation:**
+
+| Field      | Type      | Description                        |
+|------------|-----------|------------------------------------|
+| `minItems` | `integer` | Minimum number of selected values. |
+| `maxItems` | `integer` | Maximum number of selected values. |
+
+`required: true` on an array parameter means **`minItems >= 1`** -- the user must pick at least one option. If `minItems` is also given it MUST be `>= 1`, and the larger constraint wins. Selections MUST be unique and MUST come from `options`; the platform rejects duplicates and unknown values at configure time.
 
 **Example:**
 
@@ -610,9 +623,73 @@ parameters:
     validation:
       min: 1
       max: 8
+
+  - id: models
+    type: array
+    items:
+      type: string
+    title: Models
+    description: Models to download and serve. Pick one or more.
+    required: true
+    default: ["llama3.2:3b"]
+    validation:
+      maxItems: 3
+    options:
+      source:
+        type: static
+        values:
+          - value: "llama3.2:3b"
+            label: Llama 3.2 (3B)
+          - value: "qwen2.5:3b"
+            label: Qwen 2.5 (3B)
+          - value: "gemma2:2b"
+            label: Gemma 2 (2B)
+          - value: "mistral:7b"
+            label: Mistral (7B)
 ```
 
-#### 4.2 Secrets & Lifecycle
+#### 4.2 Array Parameters (Multiselect)
+
+A parameter of `type: array` lets the user pick **several** values from a fixed list -- the multi-value counterpart of `select`. It exists so that "which of these models do you want?" is one field rather than one boolean switch per option.
+
+Rules:
+
+- `items` is required and declares the element type (`string`, `number` or `integer`). Every option value and every default MUST match it.
+- `options` is required. In `v1alpha1` there is no free-form list entry: the choices always come from a [ValueSource](#5-options--value-source), and `multiselect` is the default widget.
+- `default` is a JSON array (`[]` for "nothing preselected").
+- `required`, `minItems` and `maxItems` constrain the selection -- see [4.1](#41-validation).
+- Arrays MUST NOT be `sensitive` or `generated`. A sealed value has no checkbox group to render, and secrets are not enumerable choices.
+- Arrays are not comparable in `when` / `visible` expressions -- see [7.4](#74-limitations).
+
+The selected values reach a chart as a real YAML list, not a string, because a `value` consisting of exactly one placeholder is interpolated in the parameter's native type -- see [Native-Type Interpolation](#native-type-interpolation):
+
+```yaml
+ui:
+  sections:
+    - id: model
+      title: Model Configuration
+      fields:
+        - parameterId: models
+          widget: multiselect
+
+# ...
+
+patches:
+  - op: replace
+    path: ollama.models
+    value: "{{ params.models }}"
+```
+
+With `llama3.2:3b` and `mistral:7b` checked, the component receives:
+
+```yaml
+ollama:
+  models:
+    - llama3.2:3b
+    - mistral:7b
+```
+
+#### 4.3 Secrets & Lifecycle
 
 **Sensitive parameters** (`sensitive: true`) carry the same guarantees as secret data-binding properties:
 
@@ -644,7 +721,7 @@ parameters:
 
 ### 5. Options / Value Source
 
-The `ValueSource` abstraction defines where a parameter's available options come from.
+The `ValueSource` abstraction defines where a parameter's available options come from. The same structure serves single-pick parameters (`select`) and multi-pick array parameters (`multiselect`) -- only the number of values the user may keep differs.
 
 #### 5.1 Structure
 
@@ -670,6 +747,8 @@ Each **Option**:
 |---------|----------|----------|----------------------------------|
 | `value` | `any`    | Yes      | The value stored when selected.  |
 | `label` | `string` | Yes      | Display text in the UI.          |
+
+For a scalar parameter each `value` MUST match the parameter's `type`; for an array parameter it MUST match `items.type`. `value`s MUST be unique within a source.
 
 #### 5.3 Remote Source (Future)
 
@@ -814,6 +893,41 @@ binding.<field>
 
 Double curly braces `{{ }}` interpolate a value into a string. This supports all namespaces from [7.1](#71-namespaces).
 
+##### Native-Type Interpolation
+
+Interpolation resolves **per string node**, recursively through every object and array inside a `value`. For each string node:
+
+- If the node is **exactly one placeholder** and nothing else -- no surrounding characters, no second placeholder -- the referenced value is injected in its **native type**. An array stays a list, a boolean stays a boolean, a number stays a number. The quotes in the YAML source are how a placeholder is written, not a cast to string.
+- Otherwise the node is **string interpolation**: every placeholder is rendered into text and the result is a string.
+
+```yaml
+patches:
+  # native: a real YAML list reaches the chart
+  - op: replace
+    path: ollama.models
+    value: "{{ params.models }}"
+
+  # native: an integer, not "2"
+  - op: replace
+    path: ollama.gpu.number
+    value: "{{ params.gpuCount }}"
+
+  # native, one element at a time: a one-item list of strings
+  - op: replace
+    path: ollama.models
+    value:
+      - "{{ params.modelName }}"
+
+  # string: the placeholder is surrounded by other characters
+  - op: replace
+    path: extraEnvVars.0.value
+    value: "http://{{ components.ollama.release }}:11434"
+```
+
+This is why `ollama.gpu.number` in [the Ollama example](#application-ollama--open-webui) is a number in the rendered values even though the definition writes it in quotes, and it is what makes `type: array` usable without any list-building syntax. `| json` is the explicit opposite: it always produces a string.
+
+Only a **scalar or array** value may be interpolated natively. Namespaces that resolve to a structured object (a whole `data.<slot>` binding) MUST use `| json` and produce a string.
+
 **Filters:** the expression language supports exactly one filter, `| json`, which serializes an entire slot binding to JSON. See [The `json` Filter](#the-json-filter).
 
 #### 7.3 Scope
@@ -831,6 +945,8 @@ Expressions can be used in the following contexts:
 | Static connection templates      | `spec.provides[].connection.static`       | `secrets`                                             | Fill connection properties at publication render. |
 | Provisioner environment          | `spec.provides[].connection.provisioner.env` | `secrets`, `binding`                               | Inputs for per-binding credential minting. |
 
+> **Note:** Array parameters are interpolatable but not comparable -- they may appear in `value` templates and never in `when` / `visible`. See [7.4](#74-limitations).
+
 > **Note:** Conditions (`when`, `visible`) only support values known at configure time. Component release names, namespace, and connection properties are resolved at deploy time, so they are excluded from conditions. Of the `data` namespace, only `data.<slot>.count` and `data.<slot>.interface` are known at configure time (the user has selected datasets, but credentials are not yet brokered) and are therefore allowed in `when`. `visible` remains `params`-only because the Data step is rendered after the parameter sections. Secret connection properties and `secrets.*` values MUST NOT be used in outputs or conditions -- see [Secrets & Attestation](#secrets--attestation). The `binding` namespace exists only inside provisioner environments.
 
 #### 7.4 Limitations
@@ -841,6 +957,7 @@ Expressions can be used in the following contexts:
 - No nested object access beyond the supported namespaces.
 - No ternary or conditional expressions.
 - Boolean values in comparisons must use `true` / `false` (not `1` / `0`).
+- No list operations. Array parameters are **not comparable** in `when` / `visible` -- there is no membership test, no indexing and no `length`. A definition that references an array parameter in a condition MUST be rejected at validation time. "At least one selected" is expressed as `required: true` (equivalently `minItems: 1`) on the parameter itself, which the configure form enforces before any condition is evaluated.
 
 ---
 
@@ -1428,6 +1545,16 @@ The user-facing application version is declared in `metadata.version` (SemVer) a
 
 Data interface contracts carry their own version in `metadata.version` (`v1`, `v2beta1`, ...), independent of the spec's `apiVersion`, and follow the same staging conventions. Evolution rules are defined in [Data Interface Specification](#data-interface-specification): optional additions are allowed within a version; any breaking change requires a new version file, and versions coexist in the registry.
 
+### Changelog
+
+Changes to `v1alpha1` itself. Every entry here is **additive**: documents written against an earlier revision of `v1alpha1` keep validating unchanged, so `apiVersion` stays `swarm.cloud/v1alpha1`.
+
+| Change | Summary |
+|--------|---------|
+| Multiselect parameters | New parameter `type: array` with a required `items` element schema and `options`; `validation.minItems` / `maxItems`; new `multiselect` widget. See [4.2](#42-array-parameters-multiselect). |
+| Native-type interpolation | Wrote down the rule the platform already applied to booleans and numbers -- a `value` node that is exactly one placeholder is injected in its native type -- and extended it to arrays. Documentation of existing behaviour, no change to rendered values. See [Native-Type Interpolation](#native-type-interpolation). |
+| Dataset semantic layer | `title`, `description` and `schema` travel into the binding context. |
+
 ---
 
 ## Full Examples
@@ -1851,8 +1978,10 @@ check-jsonschema --schemafile specs/app-definition.schema.json apps/ollama-webui
 check-jsonschema --schemafile specs/data-interface.schema.json interfaces/clickhouse-native/v1.yaml
 check-jsonschema --schemafile specs/data-definition.schema.json datasets/retail-transactions/data.yaml
 
-# Using ajv-cli (register referenced schemas with -r)
-ajv validate -s specs/app-definition.schema.json -r "specs/*.schema.json" -d apps/ollama-webui/app.yaml
+# Using ajv-cli (draft-07; register the referenced schemas with -r, but not the root one)
+ajv validate --spec=draft7 -s specs/app-definition.schema.json \
+  $(ls specs/*.schema.json | grep -v app-definition | sed 's/^/-r /') \
+  -d apps/ollama-webui/app.yaml
 ```
 
 ---

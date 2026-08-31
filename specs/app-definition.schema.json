@@ -178,7 +178,7 @@
         },
         "widget": {
           "type": "string",
-          "enum": ["text", "textarea", "number", "select", "switch", "slider", "password"],
+          "enum": ["text", "textarea", "number", "select", "multiselect", "switch", "slider", "password"],
           "description": "Widget type override. Defaults based on parameter type."
         },
         "visible": {

@@ -501,8 +501,13 @@ Each field binds a parameter to a UI widget.
 | `switch`      | Boolean toggle               | `boolean`                  |
 | `slider`      | Range slider                 | `number` with min/max      |
 | `password`    | Masked text input            | --                         |
+| `hostname`    | Single-line text input, for an address the deployment answers on | --      |
 
-A widget must be compatible with its parameter's type: `multiselect` requires `type: array`, and `select` requires a scalar type with `options`.
+A widget must be compatible with its parameter's type: `multiselect` requires `type: array`, and `select` requires a scalar type with `options`. `hostname` requires `type: string`.
+
+`hostname` renders like `text`, and the difference is what it tells the marketplace rather than how it looks. A string parameter is just a string: nothing in a definition otherwise says which of several of them is the address a deployment is reached on, and guessing at a name like `appHostname` would be wrong the first time a publisher called theirs something else. Marked with `hostname`, a marketplace that holds a DNS zone can offer a generated name inside it and write the records itself, instead of asking the operator to invent a name and prove control of a domain by hand. A marketplace that holds no zone renders the field as plain text, so the widget is safe to declare either way.
+
+A definition may mark more than one field: a deployment that serves a console and an API on separate ingresses has two addresses, and both are equally the deployment's own.
 
 **Example:**
 
@@ -531,10 +536,10 @@ ui:
         - parameterId: enableIngress
           widget: switch
         - parameterId: chatHostname
-          widget: text
+          widget: hostname
           visible: "params.enableIngress == true"
         - parameterId: apiHostname
-          widget: text
+          widget: hostname
           visible: "params.enableIngress == true"
 ```
 
@@ -1554,6 +1559,7 @@ Changes to `v1alpha1` itself. Every entry here is **additive**: documents writte
 | Multiselect parameters | New parameter `type: array` with a required `items` element schema and `options`; `validation.minItems` / `maxItems`; new `multiselect` widget. See [4.2](#42-array-parameters-multiselect). |
 | Native-type interpolation | Wrote down the rule the platform already applied to booleans and numbers -- a `value` node that is exactly one placeholder is injected in its native type -- and extended it to arrays. Documentation of existing behaviour, no change to rendered values. See [Native-Type Interpolation](#native-type-interpolation). |
 | Dataset semantic layer | `title`, `description` and `schema` travel into the binding context. |
+| Hostname widget | New `hostname` widget, marking the field that carries an address the deployment answers on so a marketplace holding a DNS zone can fill it in and publish the records. See [3.3](#33-widget-types). |
 
 ---
 
@@ -1611,10 +1617,10 @@ ui:
         - parameterId: enableIngress
           widget: switch
         - parameterId: chatHostname
-          widget: text
+          widget: hostname
           visible: "params.enableIngress == true"
         - parameterId: apiHostname
-          widget: text
+          widget: hostname
           visible: "params.enableIngress == true"
 
 parameters:

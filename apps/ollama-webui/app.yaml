@@ -43,10 +43,10 @@ ui:
         - parameterId: enableIngress
           widget: switch
         - parameterId: chatHostname
-          widget: text
+          widget: hostname
           visible: "params.enableIngress == true"
         - parameterId: apiHostname
-          widget: text
+          widget: hostname
           visible: "params.enableIngress == true"
 
 parameters:

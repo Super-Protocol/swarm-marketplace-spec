@@ -178,8 +178,18 @@
         },
         "widget": {
           "type": "string",
-          "enum": ["text", "textarea", "number", "select", "multiselect", "switch", "slider", "password"],
-          "description": "Widget type override. Defaults based on parameter type."
+          "enum": [
+            "text",
+            "textarea",
+            "number",
+            "select",
+            "multiselect",
+            "switch",
+            "slider",
+            "password",
+            "hostname"
+          ],
+          "description": "Widget type override. Defaults based on parameter type: `multiselect` for an array parameter. `hostname` also says what the field is: the address the deployment answers on, which a marketplace holding a DNS zone can fill in on the operator's behalf instead of asking them to prove control of a domain by hand."
         },
         "visible": {
           "type": "string",

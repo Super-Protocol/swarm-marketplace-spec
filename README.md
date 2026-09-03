@@ -18,6 +18,7 @@
     - [2.6 Dependencies & Deploy Order](#26-dependencies--deploy-order)
     - [2.7 Images](#27-images)
     - [2.8 Deployment Evidence](#28-deployment-evidence)
+        - [2.8.1 Declaring what a version attests to](#281-declaring-what-a-version-attests-to)
   - [3. UI / Presentation](#3-ui--presentation)
   - [4. Parameters](#4-parameters)
   - [5. Options / Value Source](#5-options--value-source)
@@ -436,7 +437,7 @@ Declaring `images` is RECOMMENDED for every published application; marketplace r
 
 #### 2.8 Deployment Evidence
 
-After deployment, the platform computes a signed **deployment evidence** bundle from the rendered Kubernetes manifests: volatile fields are stripped by canonicalization rules, the surviving documents are digested (JCS / SHA-256) and signed. The AppDefinition does not describe the evidence itself -- it is derived entirely from what the components render.
+After deployment, the platform computes a signed **deployment evidence** bundle from the rendered Kubernetes manifests: volatile fields are stripped by canonicalization rules, the surviving documents are digested (JCS / SHA-256) and signed. The evidence is derived entirely from what the components render; the AppDefinition shapes it only in two ways, both described below -- it may declare which fields are excluded, and it may declare the digest a deployment is expected to produce.
 
 Authors control what enters the snapshot through **annotations on the rendered resources**:
 
@@ -455,6 +456,45 @@ deployment:
         annotations:
           swarm.io/exclude-from-evidence: "true"
 ```
+
+#### 2.8.1 Declaring what a version attests to
+
+Annotations say which fields are *not* measured. They do not say what the measurement should come
+out as -- and a consumer deciding whether to hand an application their data needs exactly that: a
+value the publisher committed to **before** the deployment existed.
+
+The optional top-level `evidence` block is that commitment.
+
+```yaml
+evidence:
+  # Every deployment of this version must produce this canonical snapshot digest.
+  expectedDigest: "93d972f68011cce294adb62a5f436cc53279f03027c7c49f89cbb406a096ffda"
+  exclude:
+    - match: { kind: Ingress, name: my-app-console }
+      fields:
+        - "/spec/rules/0/host"
+```
+
+| Field            | Type     | Required | Description                                                                 |
+|------------------|----------|----------|-----------------------------------------------------------------------------|
+| `expectedDigest` | `string` | No       | Bare lowercase SHA-256 hex of the canonical snapshot every deployment of this version must produce. |
+| `exclude`        | `array`  | No       | Fields that legitimately differ between deployments, as `match` + RFC 6901 pointers. |
+
+`exclude` is the same mechanism as the annotations above, expressed where the author can reach it:
+a stock upstream chart offers no way to annotate every object it renders, and a definition that
+composes third-party charts would otherwise have no way to declare an exclusion at all. The
+platform writes these entries onto the matching resources as `swarm.io/exclude-evidence-fields`
+before it digests them, so the two routes produce the same snapshot -- prefer the annotation when
+the chart is yours.
+
+**Obtaining `expectedDigest`.** It cannot be derived from the charts: a cluster defaults fields no
+template writes, so the value only exists once something has run. Deploy the version, read the
+evidence its deployment published, and declare that. Since adding the block does not change the
+rendered manifests, a digest measured on the version without it is valid for the version with it.
+
+**What a declared digest is for.** It is what a data owner's gatekeeper pins: an application whose
+deployment stops matching the digest stops being served, without anybody having to notice. Without
+it, evidence is still produced and still signed -- there is simply nothing to hold it to.
 
 **Transparency rules** (enforced by the evidence layer):
 

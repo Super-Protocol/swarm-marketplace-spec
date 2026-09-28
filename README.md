@@ -869,7 +869,9 @@ resources:
 | `required` | `boolean`  | No       | Whether a GPU is mandatory. Default: `false`.        |
 | `minCount` | `integer`  | No       | Minimum number of GPUs.                              |
 | `minVram`  | `string`   | No       | Minimum VRAM per GPU (e.g., `8Gi`).                 |
-| `types`    | `string[]` | No       | List of acceptable GPU types.                        |
+| `types`    | `string[]` | When `required` is true | Acceptable nvidia-smi Product Name values, matched exactly, most preferred first. At least one entry when `required` is true. Example: `NVIDIA A100-SXM4-40GB`. |
+
+> **Reserved parameter ids.** The marketplace reserves a GPU only from deploy parameters whose ids are `gpuEnabled`, `gpuCount`, and `gpuModel`.
 
 > **Note on dynamic resources:** Some parameters (e.g., `gpuEnabled`, `gpuCount`) may affect actual resource consumption at runtime. The `resources` section defines the **baseline** for scheduling. Runtime resource allocation is handled by the deployment layer, not this specification.
 

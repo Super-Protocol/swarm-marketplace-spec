@@ -839,9 +839,9 @@ resources:
     minCount: 1
     minVram: "8Gi"
     types:
-      - nvidia-a100
-      - nvidia-l40s
-      - nvidia-rtx-4090
+      - NVIDIA A100-SXM4-40GB
+      - NVIDIA L40S
+      - NVIDIA GeForce RTX 4090
 ```
 
 #### 6.2 Fields
@@ -1793,9 +1793,9 @@ resources:
     minCount: 1
     minVram: "8Gi"
     types:
-      - nvidia-a100
-      - nvidia-l40s
-      - nvidia-rtx-4090
+      - NVIDIA A100-SXM4-40GB
+      - NVIDIA L40S
+      - NVIDIA GeForce RTX 4090
 
 components:
   - name: ollama

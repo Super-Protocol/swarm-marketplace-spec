@@ -66,6 +66,7 @@
     "GpuRequirements": {
       "type": "object",
       "additionalProperties": false,
+      "description": "GPU requirements. Each `types` entry is an nvidia-smi Product Name and is matched exactly. When `required` is true, `types` must list at least one product. The marketplace reserves a GPU only from deploy parameters whose ids are `gpuEnabled`, `gpuCount`, and `gpuModel`.",
       "properties": {
         "required": {
           "type": "boolean",
@@ -83,12 +84,27 @@
         },
         "types": {
           "type": "array",
+          "minItems": 1,
           "items": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
-          "description": "List of acceptable GPU types."
+          "description": "Acceptable nvidia-smi Product Name values, most preferred first. Example: NVIDIA A100-SXM4-40GB."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "required": { "const": true }
+            },
+            "required": ["required"]
+          },
+          "then": {
+            "required": ["types"]
+          }
+        }
+      ]
     }
   }
 }

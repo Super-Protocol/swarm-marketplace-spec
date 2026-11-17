@@ -862,7 +862,7 @@ resources:
 | `memory`  | `string` | Yes      | Total memory (e.g., `4Gi`, `512Mi`).                 |
 | `storage` | `string` | No       | Total persistent storage.                            |
 
-**`resources.maxPod`** -- The heaviest single pod the application schedules: its containers' limits summed, or its heaviest init container, whichever is larger, including a rolling-update surge pod of the same workload. The platform uses it to pick a node for the application and as the LimitRange `max` of the cluster space.
+**`resources.maxPod`** -- The heaviest single pod the application schedules: its containers' limits summed, or its heaviest init container, whichever is larger. A rolling-update surge pod is another pod of the same size and belongs to `min`, not here. The platform uses it to pick a node for the application and as the LimitRange `max` of the cluster space.
 
 | Field     | Type     | Required | Description                                          |
 |-----------|----------|----------|------------------------------------------------------|
@@ -873,7 +873,7 @@ Both fields are required when `maxPod` is declared; there is no `storage`, becau
 
 When `maxPod` is omitted the platform MUST fall back to `min` -- the only safe assumption it can make, and the behaviour every definition written before this field had. Declaring it is therefore never required and never changes an existing definition, but a composed application that omits it is scheduled as though its whole quota were one pod.
 
-> **Declare what the manifests actually render.** `maxPod` smaller than the real heaviest pod is worse than omitting it: the pod is admitted against a LimitRange that refuses it, or scheduled onto a node that cannot hold it, and the deployment reads as "the application is broken" rather than as a resource declaration that was wrong. Publishers SHOULD check it against their rendered manifests in CI.
+> **Declare what the manifests actually render.** `maxPod` smaller than the real heaviest pod is worse than omitting it: the pod is refused at admission by a LimitRange sized from it, or stays Pending because the cluster was chosen for a pod smaller than the real one. Either way the deployment reads as "the application is broken" rather than as a resource declaration that was wrong. Publishers SHOULD check it against their rendered manifests in CI.
 
 **`resources.recommended`** -- Recommended resources for optimal performance. Shown to the user as guidance.
 

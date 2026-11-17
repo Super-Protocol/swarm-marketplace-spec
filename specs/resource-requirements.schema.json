@@ -9,7 +9,11 @@
   "properties": {
     "min": {
       "$ref": "#/definitions/ResourceSet",
-      "description": "Minimum resources required. Deployment must be rejected if not satisfiable."
+      "description": "Total resources the application needs at once. Becomes the cluster space's quota, so it must cover every container's limits simultaneously."
+    },
+    "maxPod": {
+      "$ref": "#/definitions/MaxPodResourceSet",
+      "description": "The heaviest single pod the application schedules. The cloud uses it to pick a node and as the LimitRange max of the space. Omitted, it falls back to `min` — which forces a node as large as the whole quota."
     },
     "recommended": {
       "$ref": "#/definitions/RecommendedResourceSet",
@@ -42,6 +46,22 @@
         "storage": {
           "$ref": "#/definitions/KubernetesQuantity",
           "description": "Minimum persistent storage."
+        }
+      }
+    },
+    "MaxPodResourceSet": {
+      "type": "object",
+      "required": ["cpu", "memory"],
+      "additionalProperties": false,
+      "description": "CPU and memory of the heaviest single pod. No `storage`: a volume is claimed by the space, not by a pod, so `min.storage` is already the only figure that matters.",
+      "properties": {
+        "cpu": {
+          "$ref": "#/definitions/KubernetesQuantity",
+          "description": "CPU of the heaviest pod. Must not exceed `min.cpu`."
+        },
+        "memory": {
+          "$ref": "#/definitions/KubernetesQuantity",
+          "description": "Memory of the heaviest pod. Must not exceed `min.memory`."
         }
       }
     },

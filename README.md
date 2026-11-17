@@ -820,20 +820,28 @@ Declares the compute resources an application needs. The platform uses this info
 - **Display** resource requirements in the marketplace UI before deployment.
 - **Validate** that the target cluster can accommodate the workload.
 
-Resource requirements are global -- they describe the total resources needed by all components combined.
+Resource requirements are global -- they describe one application, not one component. Two different quantities are declared, and conflating them is the mistake this section exists to prevent:
+
+- **`min` is the quota.** Everything the application runs has to fit inside it *at once* -- every container's limit summed, including one-shot Jobs that run while the rest is already up, and the surge pod a rolling update adds.
+- **`maxPod` is the per-pod ceiling.** It is the heaviest *single* pod the application schedules, which is what has to fit on one machine.
+
+For a single-pod application the two are the same number. For a composed one they are not, and the gap grows with the number of components: an application of thirteen small pods has a quota several times larger than anything it will ever place on one node. A platform that has only `min` to go on must assume the whole quota lands on one pod, and will refuse such an application unless one node is as large as its entire quota -- which is why `maxPod` exists.
 
 #### 6.1 Structure
 
 ```yaml
 resources:
   min:
-    cpu: "4"
-    memory: "8Gi"
-    storage: "30Gi"
+    cpu: "10"
+    memory: "28Gi"
+    storage: "80Gi"
+  maxPod:
+    cpu: "2"
+    memory: "4Gi"
   recommended:
-    cpu: "8"
-    memory: "16Gi"
-    storage: "50Gi"
+    cpu: "16"
+    memory: "48Gi"
+    storage: "160Gi"
   gpu:
     required: false
     minCount: 1
@@ -846,13 +854,26 @@ resources:
 
 #### 6.2 Fields
 
-**`resources.min`** -- Minimum resources required to run the application. Deployment MUST be rejected if the target cluster cannot satisfy these.
+**`resources.min`** -- Total resources the application needs at once, and the quota the cluster space is created with. Deployment MUST be rejected if the target cluster cannot satisfy these.
 
 | Field     | Type     | Required | Description                                          |
 |-----------|----------|----------|------------------------------------------------------|
-| `cpu`     | `string` | Yes      | Minimum CPU cores (Kubernetes quantity format).       |
-| `memory`  | `string` | Yes      | Minimum memory (e.g., `4Gi`, `512Mi`).               |
-| `storage` | `string` | No       | Minimum persistent storage.                          |
+| `cpu`     | `string` | Yes      | Total CPU cores (Kubernetes quantity format).        |
+| `memory`  | `string` | Yes      | Total memory (e.g., `4Gi`, `512Mi`).                 |
+| `storage` | `string` | No       | Total persistent storage.                            |
+
+**`resources.maxPod`** -- The heaviest single pod the application schedules: its containers' limits summed, or its heaviest init container, whichever is larger. A rolling-update surge pod is another pod of the same size and belongs to `min`, not here. The platform uses it to pick a node for the application and as the LimitRange `max` of the cluster space.
+
+| Field     | Type     | Required | Description                                          |
+|-----------|----------|----------|------------------------------------------------------|
+| `cpu`     | `string` | Yes      | CPU of the heaviest pod. MUST NOT exceed `min.cpu`.  |
+| `memory`  | `string` | Yes      | Memory of the heaviest pod. MUST NOT exceed `min.memory`. |
+
+Both fields are required when `maxPod` is declared; there is no `storage`, because a volume is claimed by the cluster space rather than by a pod and `min.storage` already covers it.
+
+When `maxPod` is omitted the platform MUST fall back to `min` -- the only safe assumption it can make, and the behaviour every definition written before this field had. Declaring it is therefore never required and never changes an existing definition, but a composed application that omits it is scheduled as though its whole quota were one pod.
+
+> **Declare what the manifests actually render.** `maxPod` smaller than the real heaviest pod is worse than omitting it: the pod is refused at admission by a LimitRange sized from it, or stays Pending because the cluster was chosen for a pod smaller than the real one. Either way the deployment reads as "the application is broken" rather than as a resource declaration that was wrong. Publishers SHOULD check it against their rendered manifests in CI.
 
 **`resources.recommended`** -- Recommended resources for optimal performance. Shown to the user as guidance.
 
@@ -1639,6 +1660,7 @@ Changes to `v1alpha1` itself. Every entry here is **additive**: documents writte
 | Dataset semantic layer | `title`, `description` and `schema` travel into the binding context. |
 | Hostname widget | New `hostname` widget, marking the field that carries an address the deployment answers on so a marketplace holding a DNS zone can fill it in and publish the records. See [3.3](#33-widget-types). |
 | Consumer namespace | New `consumer` namespace, exposing the organization and the user a deployment is being made for (`consumer.organization.name` / `.slug`, `consumer.user.name` / `.email`) so a definition can read who is deploying instead of asking them to retype it. See [Consumer](#consumer). |
+| Heaviest pod | New optional `resources.maxPod` (`cpu` and `memory`), the heaviest single pod an application schedules, so a composed application is no longer scheduled as though its whole quota were one pod. Falls back to `resources.min` when omitted, which is what every earlier definition means. See [6.2](#62-fields). |
 
 ---
 

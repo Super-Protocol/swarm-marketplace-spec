@@ -1264,6 +1264,7 @@ accepts:
 | `s3-jsonl/v1`          | Read access to JSON Lines files in an S3-compatible bucket.        |
 | `s3-csv/v1`            | Read access to CSV files in an S3-compatible bucket.               |
 | `s3-npy/v1`            | Read access to NumPy array files (embeddings) in an S3-compatible bucket. |
+| `s3-h5ad/v1`           | Read access to AnnData files (`.h5ad`) in an S3-compatible bucket.  |
 
 ---
 

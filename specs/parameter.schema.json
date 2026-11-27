@@ -53,6 +53,12 @@
       "default": false,
       "description": "If true and the user leaves the field blank, the platform generates a cryptographically random value. Only valid for sensitive string parameters."
     },
+    "generatedFormat": {
+      "type": "string",
+      "enum": ["alphanumeric", "hex"],
+      "default": "alphanumeric",
+      "description": "The alphabet a generated value is drawn from, for a consumer that will not accept any random string. 'alphanumeric' (the default) is unpunctuated so the value survives connection strings and shell environments; 'hex' is lowercase hexadecimal, for a key specified as N bytes of hex, which is declared here as 'validation.minLength' of 2N and MUST be even. Requires 'generated'; it does not relax validation, which the generated value must satisfy like any other."
+    },
     "immutable": {
       "type": "boolean",
       "default": false,
@@ -71,6 +77,20 @@
     }
   },
   "allOf": [
+    {
+      "description": "'generatedFormat' describes how a value is generated, so it says nothing on a parameter the platform does not generate.",
+      "if": {
+        "required": ["generatedFormat"]
+      },
+      "then": {
+        "required": ["generated"],
+        "properties": {
+          "generated": {
+            "const": true
+          }
+        }
+      }
+    },
     {
       "description": "'items' and 'options' are required for array parameters and 'items' is forbidden elsewhere; arrays default to a list and cannot be sensitive or generated.",
       "if": {

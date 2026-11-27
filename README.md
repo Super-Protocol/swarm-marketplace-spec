@@ -600,6 +600,7 @@ Parameters define the user-configurable inputs. They are global -- shared across
 | `default`      | `any`      | No       | Default value. Must match `type`; for `array`, a list of values drawn from `options`. |
 | `sensitive`    | `boolean`  | No       | Marks the parameter as secret. Default: `false`. See [4.3](#43-secrets--lifecycle). |
 | `generated`    | `boolean`  | No       | Generate a random value when left blank. Only for sensitive string parameters. Default: `false`. |
+| `generatedFormat` | `string` | No     | Alphabet a generated value is drawn from: `alphanumeric` (default) or `hex`. Requires `generated`. See [4.3](#43-secrets--lifecycle). |
 | `immutable`    | `boolean`  | No       | Value cannot be changed when reconfiguring an existing deployment. Default: `false`. |
 | `options`      | `ValueSource` | Cond. | Defines available choices. Required when `type` is `array`. See [Value Source](#5-options--value-source). |
 | `validation`   | `object`   | No       | Validation constraints (see below).                              |
@@ -744,6 +745,33 @@ ollama:
 - The value may surface only through outputs of type `secret`.
 
 **Generated values** (`generated: true`): if the user leaves the field blank, the platform generates a cryptographically random value. Only valid on sensitive string parameters.
+
+A generated value is at least 32 characters long, and longer when `validation.minLength` says so -- that is how its length is asked for. It is drawn from the alphabet `generatedFormat` names:
+
+| `generatedFormat` | Alphabet | For |
+|---|---|---|
+| `alphanumeric` (default) | `A-Za-z0-9` | A credential a person may be shown and a service compares. Unpunctuated, so it survives a connection string, a URL and a shell environment. |
+| `hex` | `0-9a-f` | A key whose consumer specifies it as *N bytes of hexadecimal* and refuses anything else. Declare `minLength: 2N`; it MUST be even, since an odd length is half a byte. |
+
+`generatedFormat` constrains generation only. It does not relax `validation`, and the platform holds the value it generated to the parameter's own `pattern`, `minLength` and `maxLength` exactly as it holds one the user typed -- so a declaration whose generated value could not satisfy it fails at configure time, naming the parameter, rather than at the consumer's first boot:
+
+```yaml
+  - id: rpcSecret
+    type: string
+    title: Cluster RPC key
+    description: >-
+      Authenticates the storage nodes to each other. Generated; the operator never sees it.
+    required: true
+    sensitive: true
+    generated: true
+    generatedFormat: hex
+    validation:
+      pattern: "^[0-9a-f]{64}$"
+      minLength: 64
+      maxLength: 64
+```
+
+Note what the example does **not** do: share one generated parameter with a consumer that has a format contract. Every consumer of a parameter has to accept every value it can produce, so a server wanting 32 bytes of hex needs a parameter of its own -- one blank field in a form the operator never fills is cheaper than a deployment that cannot start.
 
 **Immutable parameters** (`immutable: true`) cannot be changed when reconfiguring an existing deployment (e.g. persistent volume size). The reconfigure form renders them read-only.
 
